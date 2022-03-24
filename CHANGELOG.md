@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/evvnt/stripe_presenter_plugin/compare/v1.3.1...v1.4.0) (2022-03-24)
+
+
+### Features
+
+* add new payment request form events ([73c8695](https://github.com/evvnt/stripe_presenter_plugin/commit/73c8695758eff2de025d0832155c5eeb307c6801))
+
 ## [1.3.1](https://github.com/evvnt/stripe_presenter_plugin/compare/v1.3.0...v1.3.1) (2022-03-02)
 
 
