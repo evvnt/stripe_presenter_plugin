@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    stripe_presenter_plugin (1.3.1)
+    stripe_presenter_plugin (1.4.0)
 
 GEM
   remote: https://rubygems.org/

@@ -29,21 +29,22 @@ class PaymentRequestForm {
         this.stripe.elements()
           .create('paymentRequestButton', {paymentRequest: paymentRequest})
           .mount(this.element);
-        this.element.dispatchEvent(new Event('init_succeeded', {bubbles: true}));
+        this.dispatchEvent('init_succeeded');
       } else {
         console.warn('PaymentRequestForm: not allowed to make payment')
-        this.element.dispatchEvent(new Event('init_failed', {bubbles: true}));
+        this.dispatchEvent('init_failed');
       }
     });
 
     paymentRequest.on('paymentmethod', e => {
+        this.dispatchEvent('payment_started');
+
         fetch(this.paymentIntentPath, {method: 'POST'})
           .then(r => r.json())
           .then(r => {
             const paymentIntent = r.data;
 
             if (!(paymentIntent && paymentIntent.client_secret)) {
-              e.complete('fail');
               throw new Error('missing payment intent');
             }
 
@@ -51,7 +52,7 @@ class PaymentRequestForm {
 
             // Confirm the PaymentIntent without handling potential next actions
             // (yet).
-            this.stripe.confirmCardPayment(secret,
+            return this.stripe.confirmCardPayment(secret,
               {payment_method: e.paymentMethod.id},
               {handleActions: false}
             ).then(confirmResult => {
@@ -60,13 +61,13 @@ class PaymentRequestForm {
                 // re-show the payment interface, or show an error message and close
                 // the payment interface.
                 console.error('payment failed: ', e, confirmResult);
-                this.element.dispatchEvent(new Event('payment_failed'));
+                this.dispatchEvent('payment_failed');
                 e.complete('fail');
               } else {
                 // Report to the browser that the confirmation was successful,
                 // prompting it to close the browser payment method collection
                 // interface.
-                console.log('payment succeeded: ', e);
+                console.debug('payment succeeded: ', e);
 
                 // this plugin's parameters will be sent up in the request body
                 // as a multipart form payload (notably, nested values are not
@@ -80,35 +81,38 @@ class PaymentRequestForm {
                 // Stripe.js handle the flow.
                 if (confirmResult.paymentIntent.status === 'requires_action') {
                   // Let Stripe.js handle the rest of the payment flow.
-                  this.stripe.confirmCardPayment(secret).then(result => {
+                  return this.stripe.confirmCardPayment(secret).then(result => {
                     if (result.error) {
                       // The payment failed -- ask your customer for a new payment
                       // method.
                       console.log('payment failed: ', e);
-                      this.element.dispatchEvent(new Event('payment_failed'));
+                      this.dispatchEvent('additional_action_failed');
+                      this.dispatchEvent('payment_failed');
                     } else {
                       // The payment has succeeded.
-                      this.element.dispatchEvent(new Event('payment_succeeded'));
+                      console.debug('payment succeeded: ', e);
+                      this.dispatchEvent('additional_action_succeeded');
+                      this.dispatchEvent('payment_succeeded');
                     }
                   });
                 } else {
                   // The payment has succeeded.
-                  this.element.dispatchEvent(new Event('payment_succeeded'));
+                  console.debug('payment succeeded: ', e);
+                  this.dispatchEvent('payment_succeeded');
                 }
               }
-            }).catch(err => {
-              console.error(err);
-              e.complete('fail');
             });
-          })
-          .catch(err => {
+          }).catch(err => {
             console.error(err);
+            this.dispatchEvent('payment_failed');
             e.complete('fail');
+          }).finally(() => {
+            this.dispatchEvent('payment_finished');
           });
     });
 
     paymentRequest.on('cancel', e => {
-      this.element.dispatchEvent(new Event('payment_cancelled', {bubbles: true}));
+      this.dispatchEvent('payment_cancelled');
     });
   }
 
@@ -124,5 +128,10 @@ class PaymentRequestForm {
     for (const pair of Object.entries(this.params)) {
       params.push(pair);
     }
+  }
+
+  dispatchEvent(name) {
+    this.element.dispatchEvent(new Event(name, {bubbles: true}));
+    console.debug(`PaymentRequestForm: dispatched event "${name}"`);
   }
 }
