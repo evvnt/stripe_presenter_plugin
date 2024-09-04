@@ -5,6 +5,7 @@
      data-form-type="<%= comp.form_type %>"
      data-currency="<%= comp.currency %>"
      <% if comp.address_config %>data-address-config=<%= comp.address_config.to_json %><% end %>
+     <% if comp.required_fields %>data-required-fields=<%= comp.required_fields.to_json %><% end %>
 >
   <% if comp.form_type == :single_line %>
     <%= raw File.read(File.expand_path('_credit_card_form_single_line.html', __dir__)  ) %>

@@ -69,9 +69,10 @@
     }
 
     stripeTokenData() {
-      let data = {currency: this.data.currency}
+      let data = {currency: this.data.currency, missing: []}
       if (this.data.addressConfig && this.formType !== 'single_line') {
         const config = JSON.parse(this.data.addressConfig);
+        const requiredFields = JSON.parse(this.data.requiredFields);
         for (let field in config) {
           let value = config[field]
           if (Array.isArray(value)) {
@@ -81,6 +82,9 @@
           }
           else{
             data[field] = document.getElementsByName(value)[0] ? document.getElementsByName(value)[0].value : '';
+          }
+          if (requiredFields.includes(field) && !data[field]) {
+            data['missing'].push(field);
           }
         }
       }
@@ -95,31 +99,53 @@
       if (plugin && plugin.vPlugin) {
         plugin = plugin.vPlugin
         targetComponent.disable();
-        plugin.stripe.createToken(plugin.cardNumber, plugin.stripeTokenData()).then(function (response) {
-          if (response.token) {
-            const result = {action: 'tokenize_credit_card', content: {onetime_token: response.token.id}, statusCode: 200};
-            result.content = JSON.stringify(result.content);
-            results.push(result);
-            resolve(results);
-          } else {
-            const message = response.error.message;
-            const bad_result = {
-              action: 'tokenize_credit_card',
-              contentType: 'application/json',
-              content: {errors: message},
-              statusCode: 400
-            };
-            bad_result.content = JSON.stringify(bad_result.content);
-            results.push(bad_result);
-            targetComponent.enable();
-            reject(results);
-          }
-        });
+        let tokenData = plugin.stripeTokenData();
+        if (tokenData['missing'].length === 0) {  // Don't attempt to tokenize if any required field is missing
+          delete tokenData['missing'];
+          plugin.stripe.createToken(plugin.cardNumber, tokenData).then(function (response) {
+            if (response.token) {
+              const result = {
+                action: 'tokenize_credit_card',
+                content: {
+                  onetime_token: response.token.id,
+                  card: response.token.card,
+                  client_ip: response.token.client_ip
+                },
+                statusCode: 200
+              };
+              result.content = JSON.stringify(result.content);
+              results.push(result);
+              resolve(results);
+            } else {
+              results.push(errorResult(response.error.message));
+              targetComponent.enable();
+              reject(results);
+            }
+          });
+        } else {
+          results.push(emptyResult());
+          resolve(results);
+        }
       } else {
-        results.push({action: 'tokenize_credit_card', content: JSON.stringify({onetime_token: ''}), statusCode: 200})
+        results.push(emptyResult());
         resolve(results);
       }
     });
+  }
+
+  function errorResult(message) {
+    const bad_result = {
+      action: 'tokenize_credit_card',
+      contentType: 'application/json',
+      content: {errors: message},
+      statusCode: 400
+    };
+    bad_result.content = JSON.stringify(bad_result.content);
+    return bad_result;
+  }
+
+  function emptyResult() {
+    return {action: 'tokenize_credit_card', content: JSON.stringify({onetime_token: ''}), statusCode: 200}
   }
 
   function handleElementChange(event, element) {
