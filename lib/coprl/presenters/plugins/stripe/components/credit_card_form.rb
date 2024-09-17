@@ -9,12 +9,14 @@ module Coprl
 
             attr_reader :stripe_publishable_key,
                         :address_config,
+                        :required_fields,
                         :currency,
                         :form_type
 
             def initialize(stripe_publishable_key, **attribs, &block)
               @stripe_publishable_key = stripe_publishable_key
               @address_config = attribs.delete(:address_config){ {} }
+              @required_fields = attribs.delete(:required_fields){ [] }
               @currency = attribs.delete(:currency){ 'usd' }
               @form_type = attribs[:form_type] || :multi_line
 
